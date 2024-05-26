@@ -44,7 +44,7 @@ class Customer(Base):
     email: Mapped[str] = mapped_column(db.String(320))
     phone: Mapped[str] = mapped_column(db.String(15))
     # One-to-one relationship
-    customer_account: Mapped["CustomerAccount"] = db.relationship(back_populates="customer")
+    customer_account: Mapped["CustomerAccount"] = db.relationship(back_populates="customer", uselist=False)
     # ties the customer_account attribute to the CustomerAccount class
     # allow us to see CustomerAccount info through the customer object
     # create the one-to-many relationship with the orders table
@@ -73,13 +73,14 @@ class Order(Base):
     customer_id: Mapped[int] = mapped_column(db.ForeignKey('Customers.customer_id'))
     # many-to-one relationship with the customer table
     customer: Mapped["Customer"] = db.relationship(back_populates="orders")
-    products: Mapped[List["Product"]] = db.relationship(secondary=order_product)
+    products: Mapped[List["Product"]] = db.relationship(secondary=order_product, back_populates="orders", cascade="all, delete")
 
 class Product(Base):
     __tablename__ = "Products"
     product_id: Mapped[int] = mapped_column(autoincrement=True, primary_key=True)
     name: Mapped[str] = mapped_column(db.String(255), nullable=False)
     price: Mapped[float] = mapped_column(db.Float, nullable=False)
+    orders: Mapped[List["Order"]] = db.relationship(secondary=order_product, back_populates="products")
 # association table for orders and products because 
 # there is a many to many relationship
 
@@ -190,10 +191,8 @@ def delete_customer(customer_id):
             return jsonify({"error": "Customer not found"}), 404
         
         return jsonify({"message": "Customer removed successfully!"})
-
   
-  
-           
+        
            
 class ProductSchema(ma.Schema):
     product_id = fields.Integer(required=False)
@@ -287,12 +286,35 @@ class OrderSchema(ma.Schema):
     order_id = fields.Integer(required=False)
     customer_id = fields.Integer(required=True)
     date = fields.Date(required=True)
+    products = fields.List(fields.Nested(ProductSchema))
 
     class Meta:
-        fields = ("order_id", "customer_id", "date")
+        fields = ("order_id", "customer_id", "date", "products")
         
 order_schema = OrderSchema()
 orders_schema = OrderSchema(many=True)
+
+
+
+
+@app.route("/orders/<int:order_id>/add_product", methods=["POST"])
+def add_product_to_order(order_id):
+    data = request.get_json()
+    product_id = data.get('product_id')
+    
+    if not product_id:
+        return jsonify({"error": "Product ID is required"}), 400
+    
+    order = db.session.get(Order, order_id)
+    product = db.session.get(Product, product_id)
+    
+    if not order or not product:
+        return jsonify({"error": "Order or Product not found"}), 404
+    
+    order.products.append(product)
+    db.session.commit()
+    
+    return jsonify({"message": "Product added to order successfully"}), 200
 
 
 @app.route("/orders", methods = ["POST"])
@@ -310,7 +332,7 @@ def add_order():
             session.commit()          
             
 
-    return jsonify({"message": "New order succesfully added!"}), 201
+    return jsonify({"message": "New order successfully added!"}), 201
 
 
 @app.route("/orders", methods=["GET"])
