@@ -1,7 +1,8 @@
 from flask import Flask, jsonify, request #pip install flask
+from flask_cors import CORS # pip install flask-cors
 from flask_sqlalchemy import SQLAlchemy #pip install flask-sqlalchemy
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, Session # PIP INSTALL SQLALCHEMY
-from sqlalchemy import select
+from sqlalchemy import select, delete #queries translated to python
 from flask_marshmallow import Marshmallow #PIP INSTAL FLASK-MARSHMALLOW
 from marshmallow import fields, validate, ValidationError
 from typing import List
@@ -14,8 +15,10 @@ import datetime
 # precisely, respectively
 
 app = Flask(__name__)
+cors = CORS(app) #Cross Origin Resource Sharing - allows external applications to make requests to our flask app
 # configures out application so it can find our databse using the SQLALCHEMY_DATABASE_URI key in the config object
 app.config['SQLALCHEMY_DATABASE_URI'] = "mysql+mysqlconnector://root:Carmen!1994@localhost/e_commerce_db2"
+app.json.sort_keys = False
 
 # creating a Base class that inherits the DelcarativeBase from sqlalchemy.orm
 # provides functionality for creating python classes that will become tables
@@ -144,6 +147,246 @@ def add_customer():
             session.add(new_customer)
             session.commit()
     return jsonify({"message": "New customer added successfully"}), 201 #resources was created on the server
+
+
+@app.route('/customers/<int:customer_id>', methods=["PUT"])
+def updated_customer(customer_id):
+    with Session(db.engine) as session:#Creates a session object using the SQLAlchmey Enginge
+        with session.begin(): #Begins transaction   
+            #retrieve a customer with the customer_id passed in from the request
+            query = select (Customer).filter(Customer.customer_id == customer_id)
+            result = session.execute(query).scalars().first()   #returns query results as an object, and grabs the first record returned
+            if result is None:
+                return jsonify({"error": "Customer not found"}), 404
+            
+            customer = result #naming the customer variable that we're working with
+            # customer object
+            try:
+                customer_data = customer_schema.load(request.json)
+                
+            except ValidationError as err:
+                return jsonify(err.messages), 400
+            
+            #update the customer attributes
+            for field, value in customer_data.items():
+                setattr(customer, field, value)
+                
+            session.commit() #save changes to our db
+            return jsonify({"message": "Customer details successfully updated"}), 200
+
+
+
+@app.route("/customers/<int:customer_id>", methods=["DELETE"])
+def delete_customer(customer_id):
+    # delete statement where we delete from the customer table where customer_id paramaeter
+    # matches an id within the database
+    delete_statement = delete(Customer).where(Customer.customer_id==customer_id)
+    with db.session.begin():
+        # execute the delete statement
+        result = db.session.execute(delete_statement)
+
+        #check if the customer existed to delete 
+        if result.rowcount==0: #checking that no rows were returned from the delete
+            return jsonify({"error": "Customer not found"}), 404
+        
+        return jsonify({"message": "Customer removed successfully!"})
+
+  
+  
+           
+           
+class ProductSchema(ma.Schema):
+    product_id = fields.Integer(required=False)
+    name = fields.String(required=True, validate=validate.Length(min=1))
+    price = fields.Float(required=True, validate=validate.Range(min=0))
+
+    class Meta:
+        fields = ("product_id", "name", "price")
+
+product_schema = ProductSchema()
+products_schema = ProductSchema(many=True)
+
+# WORKING WITH OUR PRODUCTS
+# adding a product
+@app.route('/products', methods=["POST"])
+def add_product():
+    try:
+        product_data = product_schema.load(request.json)
+    except ValidationError as err:
+        return jsonify(err.messages), 400
+
+    with Session(db.engine) as session:
+        with session.begin():
+            # new_product = Product(**product_data)
+            new_product = Product(name=product_data['name'], price=product_data['price'])
+            session.add(new_product)
+            session.commit()
+
+    return jsonify({"Message": "New product successfully added!"}), 201 #new resource has been created
+
+
+
+@app.route('/products', methods=["GET"])
+def get_products():
+    query = select(Product) #SELECT * FROM Product
+    result = db.session.execute(query).scalars()
+    products = result.all()
+
+    return products_schema.jsonify(products)
+
+# get product by name
+@app.route("/products/by-name", methods=["GET"])
+def get_product_by_name():
+    name = request.args.get("name")
+    search = f"%{name}%" #% is a wildcard
+    # use % with LIKE to find partial matches
+    query = select(Product).where(Product.name.like(search)).order_by(Product.price.asc())
+
+    products = db.session.execute(query).scalars().all()
+
+    return products_schema.jsonify(products)
+    
+
+@app.route("/products/<int:product_id>", methods=["PUT"])
+def update_product(product_id):
+    with Session(db.engine) as session:
+        with session.begin():
+            query = select(Product).filter(Product.product_id == product_id)
+            result = session.execute(query).scalar()  # the same as scalars().first() - first result in the scalars object
+            print(result)            
+            
+            if result is None:
+                return jsonify({"error": "Product not found!"}), 404
+            product = result
+            try:
+                product_data = product_schema.load(request.json)
+            except ValidationError as err:
+                return jsonify(err.messages), 400
+            
+            for field, value in product_data.items():
+                setattr(product, field, value)
+
+            session.commit()
+            return jsonify({"message": "Product details succesfully updated!"}), 200
+
+
+@app.route("/products/<int:product_id>", methods=["DELETE"])
+def delete_product(product_id):
+    delete_statement = delete(Product).where(Product.product_id==product_id)
+    with db.session.begin():
+        result = db.session.execute(delete_statement)
+        if result.rowcount == 0:
+            return jsonify({"error" "Product not found"}), 404
+
+        return jsonify({"message": "Product successfully deleted!"}), 200
+
+
+
+
+class OrderSchema(ma.Schema):
+    order_id = fields.Integer(required=False)
+    customer_id = fields.Integer(required=True)
+    date = fields.Date(required=True)
+
+    class Meta:
+        fields = ("order_id", "customer_id", "date")
+        
+order_schema = OrderSchema()
+orders_schema = OrderSchema(many=True)
+
+
+@app.route("/orders", methods = ["POST"])
+def add_order():
+    try:
+        order_data = order_schema.load(request.json)
+    except ValidationError as err:
+        return jsonify(err.messages), 400
+    
+    with Session(db.engine) as session:
+        with session.begin():
+            new_order = Order(customer_id=order_data['customer_id'], date = order_data['date'])        
+            
+            session.add(new_order)            
+            session.commit()          
+            
+
+    return jsonify({"message": "New order succesfully added!"}), 201
+
+
+@app.route("/orders", methods=["GET"])
+def get_orders():
+    query = select(Order)
+    result = db.session.execute(query).scalars()
+    return orders_schema.jsonify(result)
+
+@app.route("/orders/<int:customer_id>", methods=["GET"])
+def get_customer_orders(customer_id):
+    query = select(Order).filter(Order.customer_id==customer_id)
+    result = db.session.execute(query).scalars()
+    return orders_schema.jsonify(result)
+
+
+@app.route('/orders/<int:order_id>', methods=["PUT"])
+def update_order(order_id):
+    with Session(db.engine) as session:
+        with session.begin():
+            query = select(Order).filter(Order.order_id==order_id)
+            result = session.execute(query).scalar() #first result object
+            if result is None:
+                return jsonify({"message": "Product Not Found"}), 404
+            order = result
+            try:
+                order_data = order_schema.load(request.json)
+            except ValidationError as err:
+                return jsonify(err.messages), 400
+            
+            for field, value in order_data.items():
+                setattr(order, field, value)
+
+            session.commit()
+            return jsonify({"Message": "Order was successfully updated! "}), 200
+
+
+@app.route("/orders/<int:order_id>", methods=["DELETE"])
+def delete_order(order_id):
+    delete_statement = delete(Order).where(Order.order_id==order_id)
+    with db.session.begin():
+        result = db.session.execute(delete_statement)
+        if result.rowcount == 0:
+            return jsonify({"error": "Order not found" }), 404
+        return jsonify({"message": "Product removed successfully"}), 200
+
+
+
+    
+
+
+    
+             
+
+
+
+
+
+
+
+    
+
+
+    
+             
+
+
+
+
+
+
+
+
+
+    
+
+
 
 
 
