@@ -319,6 +319,7 @@ def get_orders():
     result = db.session.execute(query).scalars()
     return orders_schema.jsonify(result)
 
+# Get -ing ALL orders for one customer
 @app.route("/orders/<int:customer_id>", methods=["GET"])
 def get_customer_orders(customer_id):
     query = select(Order).filter(Order.customer_id==customer_id)
@@ -358,20 +359,107 @@ def delete_order(order_id):
 
 
 
-    
+class CustomerAccountSchema(ma.Schema):
+    account_id = fields.Integer(required=False)
+    username = fields.String(required=True, validate=validate.Length(min=3))    
+    password = fields.String(required=True, validate=validate.Length(min=6))
+    customer_id = fields.Integer(required=True)
+
+    class Meta:
+        fields = ("account_id", "username", "password", "customer_id")
+        
+customer_account_schema = CustomerAccountSchema()
+customer_accounts_schema = CustomerAccountSchema(many=True)
 
 
+@app.route("/customer_accounts", methods=["POST"])
+def add_customer_account():
+    try:
+        account_data = customer_account_schema.load(request.json)
+    except ValidationError as err:
+        return jsonify(err.messages), 400
     
+    with Session(db.engine) as session:
+        with session.begin():
+            username = account_data['username']
+            password = account_data['password']
+            customer_id = account_data['customer_id']
+            
+            new_account = CustomerAccount(username=username, password=password, customer_id=customer_id)
+            session.add(new_account)
+            session.commit()
+    
+    return jsonify({"message": "New customer account added successfully"}), 201
+
+
+# GET -ing (read) ONE customer account
+@app.route("/customer_accounts/<int:account_id>", methods=["GET"])
+def get_customer_account(account_id):  
+    query = select(CustomerAccount).filter(CustomerAccount.account_id == account_id)
+    result = db.session.execute(query).scalars().first()
+    
+    if result is None:
+        return jsonify({"error": "Customer account not found"}), 404
+    
+    return customer_account_schema.jsonify(result)
              
+# GET - ing ALL customer accounts
+@app.route("/customer_accounts", methods = ["GET"])
+def get_customer_accounts():
+    query = select(CustomerAccount)
+    result = db.session.execute(query).scalars() 
+    print(result)
+    customer_accounts = result.all() 
+
+    # convert customers through the marshmallow schema and return the response
+    return customer_accounts_schema.jsonify(customer_accounts)
 
 
+@app.route("/customer_accounts/<int:account_id>", methods=["PUT"])
+def update_customer_account(account_id):
+    with Session(db.engine) as session:
+        with session.begin():
+            query = select(CustomerAccount).filter(CustomerAccount.account_id == account_id)
+            result = session.execute(query).scalars().first()
+            
+            if result is None:
+                return jsonify({"error": "Customer account not found"}), 404
+            
+            account = result
+            try:
+                account_data = customer_account_schema.load(request.json)
+            except ValidationError as err:
+                return jsonify(err.messages), 400
+            
+            for field, value in account_data.items():
+                setattr(account, field, value)
+                
+            session.commit()
+            return jsonify({"message": "Customer account details successfully updated!"}), 200
+ 
+        
+@app.route("/customer_accounts/<int:account_id>", methods=["DELETE"])
+def delete_customer_account(account_id):
+    with Session(db.engine) as session:
+        with session.begin():
+            query = select(CustomerAccount).filter(CustomerAccount.account_id == account_id)
+            customer_account = session.execute(query).scalars().first()
+            
+            if customer_account is None:
+                return jsonify ({"error": "Customer account not found"}), 404
 
-
-
-
-
-    
-
+            customer_id = customer_account.customer_id
+            orders_query = select(Order).filter(Order.customer_id == customer_id)
+            orders = session.execute(orders_query).scalars().all()
+            
+            if orders:
+                return jsonify({"error": "Cannot delete customer accounts with associated existing orders"}), 400
+            
+            delete_statement = delete(CustomerAccount).where(CustomerAccount.account_id == account_id)
+            session.execute(delete_statement)
+            session.commit()
+            
+            return jsonify({"message": "Customer account was deleted successfully."}), 200
 
     
              
