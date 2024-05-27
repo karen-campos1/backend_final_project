@@ -305,22 +305,22 @@ Copy code
 
 ## Dependencies:
 
-Flask
-Flask-CORS
-Flask-SQLAlchemy
-Flask-Marshmallow
-Marshmallow
-SQLAlchemy
-mysql-connector-python
-datetime
+Flask  
+Flask-CORS  
+Flask-SQLAlchemy  
+Flask-Marshmallow  
+Marshmallow  
+SQLAlchemy  
+mysql-connector-python  
+datetime  
 
 
 1. Install these dependencies using:
-For PC users:
+For PC users:  
 pip install flask flask-cors flask-sqlalchemy flask-marshmallow marshmallow sqlalchemy mysql-connector-python datetime
 
 
-For Mac users:
+For Mac users:  
 pip3 install flask flask-cors flask-sqlalchemy flask-marshmallow marshmallow sqlalchemy mysql-connector-python datetime
 
 
