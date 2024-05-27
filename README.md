@@ -42,7 +42,7 @@ source venv/bin/activate
 
 ## Configuration
 
-1. Update the database connection string in the app.config: (NOTE insert your password in the capitalized text reading YOUR-PASSWORD-HERE, after colon : and before @ sign. )
+1. Update the database connection string in the app.config:  (NOTE insert your password in the capitalized text reading YOUR-PASSWORD-HERE, after colon : and before @ sign. )  
 app.config['SQLALCHEMY_DATABASE_URI'] = "mysql+mysqlconnector://root:YOUR-PASSWORD-HERE@localhost/e_commerce_db2"
 
 
