@@ -68,7 +68,8 @@ Copy code
     "email": "jane.doe@gmail.com",
     "phone": "123-456-7890"
   }
-]
+]  
+
 POST /customers
 
 Add a new customer.
@@ -85,7 +86,8 @@ json
 Copy code
 {
   "message": "New customer added successfully"
-}
+}  
+
 PUT /customers/int:customer_id
 
 Update an existing customer's details.
@@ -102,7 +104,8 @@ json
 Copy code
 {
   "message": "Customer details successfully updated"
-}
+}  
+
 DELETE /customers/int:customer_id
 
 Delete a customer.
@@ -125,7 +128,8 @@ Copy code
     "name": "Product 1",
     "price": 19.99
   }
-]
+]  
+
 POST /products
 
 Add a new product.
@@ -141,8 +145,9 @@ json
 Copy code
 {
   "Message": "New product successfully added!"
-}
-PUT /products/int:product_id
+}  
+
+PUT /products/int:product_id  
 
 Update an existing product's details.
 Request body:
@@ -157,7 +162,8 @@ json
 Copy code
 {
   "message": "Product details successfully updated!"
-}
+}  
+
 DELETE /products/int:product_id
 
 Delete a product.
@@ -166,9 +172,11 @@ json
 Copy code
 {
   "message": "Product successfully deleted!"
-}
+}  
+
+
 Orders
-GET /orders
+GET /orders  
 
 Get a list of all orders.
 Example response:
@@ -187,7 +195,8 @@ Copy code
       }
     ]
   }
-]
+]  
+
 POST /orders
 
 Add a new order.
@@ -204,13 +213,14 @@ Copy code
       "price": 19.99
     }
   ]
-}
+}  
 Example response:
 json
 Copy code
 {
   "message": "New order successfully added!"
-}
+}  
+
 PUT /orders/int:order_id
 
 Update an existing order's details.
@@ -227,13 +237,14 @@ Copy code
       "price": 29.99
     }
   ]
-}
+}  
 Example response:
 json
 Copy code
 {
   "Message": "Order was successfully updated!"
-}
+}  
+
 DELETE /orders/int:order_id
 
 Delete an order.
@@ -242,7 +253,8 @@ json
 Copy code
 {
   "message": "Order removed successfully"
-}
+}  
+
 Customer Accounts
 GET /customer_accounts
 
@@ -257,7 +269,8 @@ Copy code
     "password": "hashedpassword",
     "customer_id": 1
   }
-]
+]  
+
 POST /customer_accounts
 
 Add a new customer account.
@@ -274,7 +287,8 @@ json
 Copy code
 {
   "message": "New customer account added successfully"
-}
+}  
+
 PUT /customer_accounts/int:account_id
 
 Update an existing customer account's details.
@@ -291,7 +305,8 @@ json
 Copy code
 {
   "message": "Customer account details successfully updated!"
-}
+}  
+
 DELETE /customer_accounts/int:account_id
 
 Delete a customer account.
@@ -315,7 +330,7 @@ mysql-connector-python
 datetime  
 
 
-1. Install these dependencies using:
+1. Install these dependencies using:  
 For PC users:  
 pip install flask flask-cors flask-sqlalchemy flask-marshmallow marshmallow sqlalchemy mysql-connector-python datetime
 
