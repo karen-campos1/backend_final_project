@@ -179,7 +179,7 @@ def updated_customer(customer_id):
 
 @app.route("/customers/<int:customer_id>", methods=["DELETE"])
 def delete_customer(customer_id):
-    # delete statement where we delete from the customer table where customer_id paramaeter
+    # delete statement where we delete from the customer table where customer_id parameter
     # matches an id within the database
     delete_statement = delete(Customer).where(Customer.customer_id==customer_id)
     with db.session.begin():
@@ -370,14 +370,36 @@ def update_order(order_id):
             return jsonify({"Message": "Order was successfully updated! "}), 200
 
 
+
 @app.route("/orders/<int:order_id>", methods=["DELETE"])
 def delete_order(order_id):
-    delete_statement = delete(Order).where(Order.order_id==order_id)
-    with db.session.begin():
-        result = db.session.execute(delete_statement)
-        if result.rowcount == 0:
-            return jsonify({"error": "Order not found" }), 404
-        return jsonify({"message": "Product removed successfully"}), 200
+    try:
+        with db.session.begin():
+            # Delete associated rows in the order_product table
+            delete_order_product_statement = delete(order_product).where(order_product.c.order_id == order_id)
+            db.session.execute(delete_order_product_statement)
+            
+            # Check if the order exists before attempting to delete it
+            order_query = select(Order).where(Order.order_id == order_id)
+            order = db.session.execute(order_query).scalar_one_or_none()
+            
+            if order is None:
+                return jsonify({"error": "Order not found"}), 404
+
+            # Delete the order
+            delete_order_statement = delete(Order).where(Order.order_id == order_id)
+            result = db.session.execute(delete_order_statement)
+
+            # Check if the order was deleted
+            if result.rowcount == 0:
+                return jsonify({"error": "Failed to delete order"}), 400
+
+            db.session.commit()  # Commit the transaction if the order and related rows were deleted
+        return jsonify({"message": "Order removed successfully"}), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
 
 
 
@@ -485,12 +507,6 @@ def delete_customer_account(account_id):
 
     
              
-
-
-
-
-
-
 
 
 
