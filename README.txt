@@ -4,6 +4,7 @@ This is a Flask-based API for an e-commerce application, providing endpoints for
 
 ## Table of Contents
 
+- Screenshots
 - Installation
 - Configuration
 - Running the Application
@@ -13,6 +14,12 @@ This is a Flask-based API for an e-commerce application, providing endpoints for
   - Orders
   - Customer Accounts
 - Dependencies
+
+## Screenshots:
+Image showing -Postman -Workbench
+
+![Screenshot of the Postman](images/image_postman.png)
+![Screenshot of the Postman](images/image_workbench.png)
 
 ## Installation
 1. Clone the repository: 
