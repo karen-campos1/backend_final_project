@@ -9,55 +9,40 @@ from typing import List
 import datetime
 
 
-# categorically, clearly, correctly, 
-# definitely, especially, exactly, 
-# explicitly, individually, pointedly, 
-# precisely, respectively
 
 app = Flask(__name__)
-cors = CORS(app) #Cross Origin Resource Sharing - allows external applications to make requests to our flask app
-# configures out application so it can find our databse using the SQLALCHEMY_DATABASE_URI key in the config object
+cors = CORS(app, resources={r"/*": {"origins": "http://localhost:5173"}})
 app.config['SQLALCHEMY_DATABASE_URI'] = "mysql+mysqlconnector://root:Carmen!1994@localhost/e_commerce_db2"
 app.json.sort_keys = False
 
-# creating a Base class that inherits the DelcarativeBase from sqlalchemy.orm
-# provides functionality for creating python classes that will become tables
-# in our database
-# ALL classes we create will inherit from the Base class
 class Base(DeclarativeBase):
     pass
 
-# istantiats Flask-SQLAlchemy
-# creates an instance of SQLAlchemy that we pass our flask application too
-# and then specify the class to use for model building - python classes that become SQL Tables
+
 db = SQLAlchemy(app, model_class=Base)
 ma = Marshmallow(app)
 
 # Creating Models - Class that becomes a table in our database
 class Customer(Base):
-    # the name of our table when it makes over to SQL
     __tablename__ = "Customers"
-    # column_name - Mapped to translate the python type to our SQL type int to INTEGER or str to VARCHAR
-    # mapped_column - providing any additional constraints to the column - primary_key, nullable, character limits etc...
     customer_id: Mapped[int] = mapped_column(autoincrement=True, primary_key = True)
     name: Mapped[str] = mapped_column(db.String(255)) #VARCHAR(255) in sql
     email: Mapped[str] = mapped_column(db.String(320))
     phone: Mapped[str] = mapped_column(db.String(15))
     # One-to-one relationship
     customer_account: Mapped["CustomerAccount"] = db.relationship(back_populates="customer", uselist=False)
-    # ties the customer_account attribute to the CustomerAccount class
-    # allow us to see CustomerAccount info through the customer object
-    # create the one-to-many relationship with the orders table
+
     orders: Mapped[List["Order"]] = db.relationship(back_populates="customer")
-    # orders is a list of Order objects
+   
 class CustomerAccount(Base):
     __tablename__ = "Customer_Accounts"
     account_id: Mapped[int] = mapped_column(autoincrement=True, primary_key=True)
     username: Mapped[str] = mapped_column(db.String(255), unique=True, nullable=False)
     password: Mapped[str] = mapped_column(db.String(255), nullable=False)
     customer_id: Mapped[int] = mapped_column(db.ForeignKey("Customers.customer_id"))
-    # One-to-one relationshop between customer and customer_account
+    # One-to-one relationship between customer and customer_account
     customer: Mapped['Customer'] = db.relationship(back_populates="customer_account")
+
 
 order_product = db.Table(
     "Order_Product",
@@ -79,14 +64,17 @@ class Product(Base):
     __tablename__ = "Products"
     product_id: Mapped[int] = mapped_column(autoincrement=True, primary_key=True)
     name: Mapped[str] = mapped_column(db.String(255), nullable=False)
+    description: Mapped[str] = mapped_column(db.String(255), nullable=False)
     price: Mapped[float] = mapped_column(db.Float, nullable=False)
+    image_url: Mapped[str] = mapped_column(db.String(255), nullable=False)
+    category: Mapped[str] = mapped_column(db.String(255), nullable=False)
     orders: Mapped[List["Order"]] = db.relationship(secondary=order_product, back_populates="products")
 # association table for orders and products because 
 # there is a many to many relationship
 
 
 # create all tables 
-with app.app_context(): #gives the db access to our current instance of the app
+with app.app_context():
     db.create_all()
 
 
@@ -104,28 +92,15 @@ class CustomerSchema(ma.Schema):
 customer_schema = CustomerSchema()
 customers_schema = CustomerSchema(many=True)
 
-
-@app.route("/")
-def home():
-    return "JUST MAKING SURE ITS RUNNING AND PRINTING :) "
-
-# ============================= API ROUTES =========================
-# for GET-ing ONE single customer
-# @app.route("/customers/<int:customer_id>", methods = ["GET"])
-# def get_customers(customer_id):
-
 # GET -ing customers
 @app.route("/customers", methods = ["GET"])
 def get_customers():
-    # we're using the class Customer as a model for the Customers table
-    query = select(Customer) #creates a SELECT query for the customer table SELECT * FROM Customers
-    result = db.session.execute(query).scalars() #sequence of customer objects, rather than a list of rows or tuples
+    query = select(Customer) 
+    result = db.session.execute(query).scalars() #
     print(result)
-    customers = result.all() #Fetches all rows of data from the result
+    customers = result.all() 
 
-    # convert customers through the marshmallow schema and return the response
     return customers_schema.jsonify(customers)
-
 
 
 #POST -ing a customer
@@ -163,7 +138,7 @@ def updated_customer(customer_id):
             customer = result #naming the customer variable that we're working with
             # customer object
             try:
-                customer_data = customer_schema.load(request.json)
+                customer_data = customer_schema.load(request.json,partial=True)
                 
             except ValidationError as err:
                 return jsonify(err.messages), 400
@@ -197,10 +172,13 @@ def delete_customer(customer_id):
 class ProductSchema(ma.Schema):
     product_id = fields.Integer(required=False)
     name = fields.String(required=True, validate=validate.Length(min=1))
+    description = fields.String(required=True)
     price = fields.Float(required=True, validate=validate.Range(min=0))
+    image_url = fields.String(required=True)
+    category = fields.String(required=True)
 
     class Meta:
-        fields = ("product_id", "name", "price")
+        fields = ("product_id", "description", "name", "price", "image_url", "category")
 
 product_schema = ProductSchema()
 products_schema = ProductSchema(many=True)
@@ -217,12 +195,11 @@ def add_product():
     with Session(db.engine) as session:
         with session.begin():
             # new_product = Product(**product_data)
-            new_product = Product(name=product_data['name'], price=product_data['price'])
+            new_product = Product(name=product_data['name'], description=product_data['description'], price=product_data['price'], image_url=product_data['image_url'], category=product_data['category'])
             session.add(new_product)
             session.commit()
 
     return jsonify({"Message": "New product successfully added!"}), 201 #new resource has been created
-
 
 
 @app.route('/products', methods=["GET"])
@@ -281,7 +258,6 @@ def delete_product(product_id):
 
 
 
-
 class OrderSchema(ma.Schema):
     order_id = fields.Integer(required=False)
     customer_id = fields.Integer(required=True)
@@ -293,7 +269,6 @@ class OrderSchema(ma.Schema):
         
 order_schema = OrderSchema()
 orders_schema = OrderSchema(many=True)
-
 
 
 
@@ -436,6 +411,22 @@ def add_customer_account():
     return jsonify({"message": "New customer account added successfully"}), 201
 
 
+@app.route('/login', methods=['POST'])
+def login():
+    data = request.json
+    username = data.get('username')
+    password = data.get('password')
+
+    query = select(CustomerAccount).filter(CustomerAccount.username == username)
+    account = db.session.execute(query).scalars().first()
+
+    if account and account.password == password:
+        token = "fake-jwt-token"  #fake token
+        return jsonify({"message": "Login successful!", "token": token}), 200
+    else:
+        return jsonify({"message": "Invalid credentials"}), 401
+
+
 # GET -ing (read) ONE customer account
 @app.route("/customer_accounts/<int:account_id>", methods=["GET"])
 def get_customer_account(account_id):  
@@ -505,15 +496,7 @@ def delete_customer_account(account_id):
             
             return jsonify({"message": "Customer account was deleted successfully."}), 200
 
-    
              
-
-
-
-    
-
-
-
 
 
 
