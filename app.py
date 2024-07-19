@@ -7,12 +7,18 @@ from flask_marshmallow import Marshmallow #PIP INSTAL FLASK-MARSHMALLOW
 from marshmallow import fields, validate, ValidationError
 from typing import List
 import datetime
-
+from dotenv import load_dotenv, find_dotenv
+import os
 
 
 app = Flask(__name__)
 cors = CORS(app, resources={r"/*": {"origins": "http://localhost:5173"}})
-app.config['SQLALCHEMY_DATABASE_URI'] = "mysql+mysqlconnector://root:Carmen!1994@localhost/e_commerce_db2"
+load_dotenv(find_dotenv())
+# print("Database URL from .env:", os.getenv('DATABASE_URL'))
+app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get('DATABASE_URL')
+app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv('DATABASE_URL')
+
+# print("SQLALCHEMY_DATABASE_URI in config:", app.config["SQLALCHEMY_DATABASE_URI"])
 app.json.sort_keys = False
 
 class Base(DeclarativeBase):
@@ -396,6 +402,7 @@ def add_customer_account():
     try:
         account_data = customer_account_schema.load(request.json)
     except ValidationError as err:
+        print(f"Validation error: {err.messages}")
         return jsonify(err.messages), 400
     
     with Session(db.engine) as session:
